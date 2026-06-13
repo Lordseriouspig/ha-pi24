@@ -43,9 +43,31 @@ class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
         )
         self.config_entry = config_entry
         self.client = client
+        self.total_aircraft_sightings = 0
+        self.seen_aircraft_ids: set[str] = set()
+
+    @property
+    def cumulative_aircraft_count(self) -> int:
+        """Return the total number of aircraft sightings during this coordinator lifetime."""
+
+        return self.total_aircraft_sightings
+
+    @property
+    def unique_aircraft_count(self) -> int:
+        """Return the number of unique aircraft seen during this coordinator lifetime."""
+
+        return len(self.seen_aircraft_ids)
 
     async def _async_update_data(self) -> dict[str, object]:
         data = await self.client.async_update()
         if data["status"] == UPDATE_ERROR:
             raise UpdateFailed("Unable to fetch Pi24 data")
+
+        entries = data.get("entries") or {}
+        self.total_aircraft_sightings += len(entries)
+        for entry in entries.values():
+            external_id = getattr(entry, "external_id", None)
+            if external_id:
+                self.seen_aircraft_ids.add(external_id)
+
         return data

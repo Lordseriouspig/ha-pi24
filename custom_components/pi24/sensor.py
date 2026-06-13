@@ -57,6 +57,13 @@ def _nearest_entry(data: dict[str, object]):
 	return min(candidates, key=lambda entry: entry.distance_to_home)
 
 
+def _furthest_entry(data: dict[str, object]):
+	candidates = [entry for entry in _entries(data) if getattr(entry, "coordinates", None)]
+	if not candidates:
+		return None
+	return max(candidates, key=lambda entry: entry.distance_to_home)
+
+
 def _serialize_datetime(value: datetime | None) -> str | None:
 	"""Return an ISO formatted datetime string for entity attributes."""
 
@@ -81,6 +88,12 @@ def _aircraft_summary(entry) -> dict[str, object | None]:
 	}
 
 
+def _entry_summary(entry) -> dict[str, object | None]:
+	"""Build a shared aircraft summary for state attributes."""
+
+	return _aircraft_summary(entry)
+
+
 SENSOR_DESCRIPTIONS: tuple[Pi24SensorEntityDescription, ...] = (
 	Pi24SensorEntityDescription(
 		key="status",
@@ -94,6 +107,20 @@ SENSOR_DESCRIPTIONS: tuple[Pi24SensorEntityDescription, ...] = (
 		icon="mdi:airplane",
 		state_class=SensorStateClass.MEASUREMENT,
 		value_fn=lambda data: len(_entries(data)),
+	),
+	Pi24SensorEntityDescription(
+		key="cumulative_aircraft_count",
+		name="Total Aircraft Count",
+		icon="mdi:counter",
+		state_class=SensorStateClass.MEASUREMENT,
+		value_fn=lambda data: 0,
+	),
+	Pi24SensorEntityDescription(
+		key="unique_aircraft_count",
+		name="Unique Aircraft Count",
+		icon="mdi:counter",
+		state_class=SensorStateClass.MEASUREMENT,
+		value_fn=lambda data: 0,
 	),
 	Pi24SensorEntityDescription(
 		key="nearest_aircraft",
@@ -110,6 +137,23 @@ SENSOR_DESCRIPTIONS: tuple[Pi24SensorEntityDescription, ...] = (
 		state_class=SensorStateClass.MEASUREMENT,
 		value_fn=lambda data: round(_nearest_entry(data).distance_to_home, 1)
 		if _nearest_entry(data)
+		else None,
+	),
+	Pi24SensorEntityDescription(
+		key="furthest_aircraft",
+		name="Furthest Aircraft",
+		icon="mdi:crosshairs-gps",
+		value_fn=lambda data: getattr(_furthest_entry(data), "callsign", None)
+		or getattr(_furthest_entry(data), "external_id", None),
+	),
+	Pi24SensorEntityDescription(
+		key="furthest_distance",
+		name="Furthest Distance",
+		icon="mdi:map-marker-distance",
+		native_unit_of_measurement=UnitOfLength.KILOMETERS,
+		state_class=SensorStateClass.MEASUREMENT,
+		value_fn=lambda data: round(_furthest_entry(data).distance_to_home, 1)
+		if _furthest_entry(data)
 		else None,
 	),
 	Pi24SensorEntityDescription(
@@ -155,6 +199,11 @@ class Pi24Sensor(CoordinatorEntity[Pi24Coordinator], SensorEntity):
 	def native_value(self):
 		"""Return the current sensor value."""
 
+		if self.entity_description.key == "cumulative_aircraft_count":
+			return self.coordinator.cumulative_aircraft_count
+		if self.entity_description.key == "unique_aircraft_count":
+			return self.coordinator.unique_aircraft_count
+
 		data = self.coordinator.data or {}
 		return self.entity_description.value_fn(data)
 
@@ -166,11 +215,26 @@ class Pi24Sensor(CoordinatorEntity[Pi24Coordinator], SensorEntity):
 		if self.entity_description.key == "aircraft_count":
 			entries = _entries(data)
 			return {
-				"aircraft": [_aircraft_summary(entry) for entry in entries],
+				"aircraft": [_entry_summary(entry) for entry in entries],
 				"aircraft_ids": [entry.external_id for entry in entries],
 			}
 
-		nearest = _nearest_entry(data)
+		if self.entity_description.key == "cumulative_aircraft_count":
+			return {
+				"total_aircraft_sightings": self.coordinator.total_aircraft_sightings,
+			}
+
+		if self.entity_description.key == "unique_aircraft_count":
+			return {
+				"seen_aircraft_ids": sorted(self.coordinator.seen_aircraft_ids),
+			}
+
+		if self.entity_description.key in {"furthest_aircraft", "furthest_distance"}:
+			selected = _furthest_entry(data)
+		else:
+			selected = _nearest_entry(data)
+
+		nearest = selected
 		if nearest is None:
 			return {}
 

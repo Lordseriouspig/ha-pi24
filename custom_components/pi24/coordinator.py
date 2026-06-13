@@ -12,3 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
+import logging
+from datetime import timedelta
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+
+from .const import DOMAIN, UPDATE_ERROR
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
+    """Coordinate a single Pi24 instance."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        client,
+    ) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}-{config_entry.entry_id}",
+            update_interval=timedelta(seconds=15),
+        )
+        self.config_entry = config_entry
+        self.client = client
+
+    async def _async_update_data(self) -> dict[str, object]:
+        data = await self.client.async_update()
+        if data["status"] == UPDATE_ERROR:
+            raise UpdateFailed("Unable to fetch Pi24 data")
+        return data

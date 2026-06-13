@@ -14,3 +14,23 @@
  limitations under the License.
 -->
 
+# Pi24 Monitor
+
+Home Assistant custom integration for monitoring Pi24 ADS-B receivers through the `flightradar-client` Python library.
+
+## What it provides
+
+- Receiver status sensor
+- Active aircraft count sensor
+- Nearest aircraft sensor
+- Nearest distance sensor
+- Latest update timestamp sensor
+
+## Setup
+
+1. Install the integration through HACS or copy `custom_components/pi24` into your Home Assistant config.
+2. Add a new Pi24 instance from the Home Assistant integrations page.
+3. Enter the receiver host, port, receiver coordinates, and feed type.
+
+The integration supports both `fr24feed` and `dump1090` feeds.
+

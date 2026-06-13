@@ -1,0 +1,12 @@
+{
+    "domain": "pi24",
+    "name": "Pi24 Monitor",
+    "version": "0.1.0",
+    "codeowners": ["@lordseriouspig"],
+    "dependencies": [],
+    "documentation": "https://github.com/lordseriouspig/ha-pi24/blob/main/README.md",
+    "integration_type": "device",
+    "iot_class": "local_polling",
+    "requirements": ["flightradar-client==0.9"],
+    "issue_tracker": "https://github.com/lordseriouspig/ha-pi24/issues"
+}

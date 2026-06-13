@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Callable, cast
 
 from homeassistant.components.sensor import (
@@ -54,6 +55,30 @@ def _nearest_entry(data: dict[str, object]):
 	if not candidates:
 		return None
 	return min(candidates, key=lambda entry: entry.distance_to_home)
+
+
+def _serialize_datetime(value: datetime | None) -> str | None:
+	"""Return an ISO formatted datetime string for entity attributes."""
+
+	if value is None:
+		return None
+	return value.isoformat()
+
+
+def _aircraft_summary(entry) -> dict[str, object | None]:
+	"""Build a compact summary for one aircraft entry."""
+
+	return {
+		"id": entry.external_id,
+		"callsign": entry.callsign,
+		"altitude": entry.altitude,
+		"speed": entry.speed,
+		"track": entry.track,
+		"squawk": entry.squawk,
+		"distance_km": round(entry.distance_to_home, 1) if entry.coordinates else None,
+		"coordinates": entry.coordinates,
+		"updated": _serialize_datetime(entry.updated),
+	}
 
 
 SENSOR_DESCRIPTIONS: tuple[Pi24SensorEntityDescription, ...] = (
@@ -138,6 +163,13 @@ class Pi24Sensor(CoordinatorEntity[Pi24Coordinator], SensorEntity):
 		"""Expose a few useful feed attributes."""
 
 		data = self.coordinator.data or {}
+		if self.entity_description.key == "aircraft_count":
+			entries = _entries(data)
+			return {
+				"aircraft": [_aircraft_summary(entry) for entry in entries],
+				"aircraft_ids": [entry.external_id for entry in entries],
+			}
+
 		nearest = _nearest_entry(data)
 		if nearest is None:
 			return {}
@@ -148,7 +180,7 @@ class Pi24Sensor(CoordinatorEntity[Pi24Coordinator], SensorEntity):
 			"speed": nearest.speed,
 			"track": nearest.track,
 			"squawk": nearest.squawk,
-			"updated": nearest.updated,
+			"updated": _serialize_datetime(nearest.updated),
 		}
 
 	@property

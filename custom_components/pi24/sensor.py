@@ -110,7 +110,7 @@ SENSOR_DESCRIPTIONS: tuple[Pi24SensorEntityDescription, ...] = (
 	),
 	Pi24SensorEntityDescription(
 		key="cumulative_aircraft_count",
-		name="Total Aircraft Count",
+		name="Cumulative Aircraft Entries",
 		icon="mdi:counter",
 		state_class=SensorStateClass.MEASUREMENT,
 		value_fn=lambda data: 0,
@@ -221,7 +221,7 @@ class Pi24Sensor(CoordinatorEntity[Pi24Coordinator], SensorEntity):
 
 		if self.entity_description.key == "cumulative_aircraft_count":
 			return {
-				"total_aircraft_sightings": self.coordinator.total_aircraft_sightings,
+				"total_aircraft_entries": self.coordinator.total_aircraft_entries,
 			}
 
 		if self.entity_description.key == "unique_aircraft_count":

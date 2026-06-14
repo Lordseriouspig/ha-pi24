@@ -43,14 +43,15 @@ class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
         )
         self.config_entry = config_entry
         self.client = client
-        self.total_aircraft_sightings = 0
+        self.total_aircraft_entries = 0
         self.seen_aircraft_ids: set[str] = set()
+        self._previous_active_aircraft_ids: set[str] = set()
 
     @property
     def cumulative_aircraft_count(self) -> int:
-        """Return the total number of aircraft sightings during this coordinator lifetime."""
+        """Return the total number of airspace entries during this coordinator lifetime."""
 
-        return self.total_aircraft_sightings
+        return self.total_aircraft_entries
 
     @property
     def unique_aircraft_count(self) -> int:
@@ -64,10 +65,20 @@ class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
             raise UpdateFailed("Unable to fetch Pi24 data")
 
         entries = data.get("entries") or {}
-        self.total_aircraft_sightings += len(entries)
+        current_aircraft_ids: set[str] = set()
         for entry in entries.values():
             external_id = getattr(entry, "external_id", None)
             if external_id:
+                current_aircraft_ids.add(external_id)
+
+        entered_aircraft_ids = current_aircraft_ids.difference(
+            self._previous_active_aircraft_ids
+        )
+        self.total_aircraft_entries += len(entered_aircraft_ids)
+        for external_id in entered_aircraft_ids:
+            if external_id:
                 self.seen_aircraft_ids.add(external_id)
+
+        self._previous_active_aircraft_ids = current_aircraft_ids
 
         return data

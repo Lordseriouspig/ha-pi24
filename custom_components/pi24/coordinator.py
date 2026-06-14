@@ -19,6 +19,7 @@ from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, UPDATE_ERROR
@@ -28,6 +29,8 @@ _LOGGER = logging.getLogger(__name__)
 
 class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
     """Coordinate a single Pi24 instance."""
+
+    STORAGE_VERSION = 1
 
     def __init__(
         self,
@@ -43,9 +46,38 @@ class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
         )
         self.config_entry = config_entry
         self.client = client
+        self._store = Store(
+            hass,
+            self.STORAGE_VERSION,
+            f"{DOMAIN}_{config_entry.entry_id}",
+        )
         self.total_aircraft_entries = 0
         self.seen_aircraft_ids: set[str] = set()
         self._previous_active_aircraft_ids: set[str] = set()
+
+    async def async_load_state(self) -> None:
+        """Restore persisted counter state."""
+
+        stored_data = await self._store.async_load()
+        if not stored_data:
+            return
+
+        self.total_aircraft_entries = int(stored_data.get("total_aircraft_entries", 0))
+        self.seen_aircraft_ids = set(stored_data.get("seen_aircraft_ids", []))
+        self._previous_active_aircraft_ids = set(
+            stored_data.get("previous_active_aircraft_ids", [])
+        )
+
+    async def async_save_state(self) -> None:
+        """Persist counter state."""
+
+        await self._store.async_save(
+            {
+                "total_aircraft_entries": self.total_aircraft_entries,
+                "seen_aircraft_ids": sorted(self.seen_aircraft_ids),
+                "previous_active_aircraft_ids": sorted(self._previous_active_aircraft_ids),
+            }
+        )
 
     @property
     def cumulative_aircraft_count(self) -> int:
@@ -80,5 +112,6 @@ class Pi24Coordinator(DataUpdateCoordinator[dict[str, object]]):
                 self.seen_aircraft_ids.add(external_id)
 
         self._previous_active_aircraft_ids = current_aircraft_ids
+        await self.async_save_state()
 
         return data

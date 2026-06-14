@@ -60,8 +60,9 @@ async def async_setup_entry(
 
         removed_ids = known_ids - active_ids
         for external_id in removed_ids:
-            entity = entities.pop(external_id)
-            hass.async_create_task(entity.async_remove(force_remove=True))
+            entity = entities[external_id]
+            entity._attr_available = False
+            entity.async_write_ha_state()
 
         new_entities: list[Pi24AircraftLocationEvent] = []
         added_ids = active_ids - known_ids
